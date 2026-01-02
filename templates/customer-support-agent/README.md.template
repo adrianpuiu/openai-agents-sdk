@@ -1,0 +1,49 @@
+# {{PROJECT_NAME}}
+
+{{DESCRIPTION}}
+
+## Setup
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Set up environment:
+```bash
+cp .env.example .env
+# Edit .env and add your OPENAI_API_KEY
+```
+
+3. Get your API key from https://platform.openai.com/api-keys
+
+## Running
+
+```bash
+npm start "Your message here"
+```
+
+## Agent Capabilities
+
+This agent can:
+- Look up order information
+- Process return requests
+- Escalate to human agents
+
+## Tools
+
+- `lookupOrder`: Get order details by ID
+- `processReturn`: Handle return requests
+- `escalateToHuman`: Transfer to human agent
+
+## Development
+
+```bash
+npm run typecheck  # Check types
+```
+
+## Customization
+
+Edit the following files to customize:
+- `src/agents/support-agent.ts` - Agent instructions and behavior
+- `src/tools/` - Tool implementations

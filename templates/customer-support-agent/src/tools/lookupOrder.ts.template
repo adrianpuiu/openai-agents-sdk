@@ -1,0 +1,32 @@
+import { z } from 'zod';
+
+/**
+ * {{TODO_DESCRIPTION}}
+ *
+ * TODO: Connect to your order management system
+ * TODO: Implement proper error handling
+ * TODO: Add authentication/authorization checks
+ */
+export const lookupOrder = {
+  name: 'lookup_order',
+  description: '{{DESCRIPTION}}',
+  parameters: z.object({
+    orderId: z.string().min(1).describe('{{PARAM_DESCRIPTION}}')
+  }),
+  execute: async ({ orderId }) => {
+    // TODO: {{TODO_IMPLEMENTATION}}
+    // Example: const order = await db.query('SELECT * FROM orders WHERE id = $1', [orderId]);
+
+    console.log(`Looking up order: ${orderId}`);
+
+    // Placeholder response
+    return {
+      orderId,
+      status: 'shipped',
+      items: [],
+      trackingNumber: '',
+      orderDate: new Date().toISOString().split('T')[0],
+      total: 0
+    };
+  }
+};

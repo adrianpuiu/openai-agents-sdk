@@ -1,0 +1,15 @@
+import { agents } from 'openai-agents-sdk';
+import { supportAgent } from './agents/support-agent';
+
+async function main() {
+  const message = process.argv[2] || 'Hello! How can I help you today?';
+
+  const response = await agents.run({
+    agent: supportAgent,
+    message
+  });
+
+  console.log(response.output);
+}
+
+main().catch(console.error);

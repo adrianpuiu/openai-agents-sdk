@@ -1,0 +1,31 @@
+import { z } from 'zod';
+
+/**
+ * {{TODO_DESCRIPTION}}
+ *
+ * TODO: Connect to your returns management system
+ * TODO: Implement return label generation
+ * TODO: Add validation for return eligibility
+ */
+export const processReturn = {
+  name: 'process_return',
+  description: '{{DESCRIPTION}}',
+  parameters: z.object({
+    orderId: z.string().describe('The order ID to process return for'),
+    reason: z.string().describe('Reason for return'),
+    items: z.array(z.string()).describe('List of product IDs to return')
+  }),
+  execute: async ({ orderId, reason, items }) => {
+    // TODO: {{TODO_IMPLEMENTATION}}
+    console.log(`Processing return for order ${orderId}:`, { reason, items });
+
+    // Placeholder response
+    return {
+      success: true,
+      returnLabel: `RETURN-${Date.now()}`,
+      refundAmount: 0,
+      refundDate: new Date().toISOString().split('T')[0],
+      instructions: 'Package items and attach return label. Drop off at any location.'
+    };
+  }
+};

@@ -1,0 +1,29 @@
+import { z } from 'zod';
+
+/**
+ * Escalate to human agent when automated resolution is not possible
+ *
+ * TODO: Integrate with your human agent notification system
+ * TODO: Include conversation context in escalation
+ */
+export const escalateToHuman = {
+  name: 'escalate_to_human',
+  description: 'Escalate the conversation to a human agent when the issue cannot be resolved automatically',
+  parameters: z.object({
+    reason: z.string().describe('Reason for escalation'),
+    urgency: z.enum(['low', 'medium', 'high']).describe('Urgency level')
+  }),
+  execute: async ({ reason, urgency }) => {
+    // TODO: Implement escalation notification
+    // Example: await notificationSystem.notifyHumanAgent({ reason, urgency, conversationHistory });
+
+    console.log(`Escalating to human (urgency: ${urgency}): ${reason}`);
+
+    return {
+      escalated: true,
+      ticketId: `TICKET-${Date.now()}`,
+      estimatedWaitTime: '5-10 minutes',
+      message: 'A human agent will be with you shortly.'
+    };
+  }
+};

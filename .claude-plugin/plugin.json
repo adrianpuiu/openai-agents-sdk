@@ -1,0 +1,10 @@
+{
+  "name": "openai-agents-sdk",
+  "version": "0.1.0",
+  "description": "Help non-developers create AI agents using OpenAI Agents SDK for TypeScript with natural language descriptions",
+  "author": {
+    "name": "Claude Code",
+    "email": "noreply@anthropic.com"
+  },
+  "keywords": ["openai", "agents", "typescript", "sdk", "orchestration"]
+}
