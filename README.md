@@ -276,11 +276,19 @@ The plugin includes comprehensive examples and templates to help you get started
 
 ### Examples (`examples/`)
 
+**Core Patterns:**
 - **single-agent-with-tools.md** - Complete single agent with multiple tools
 - **multi-agent-with-handoffs.md** - Multi-agent triage pattern implementation
 - **advanced-patterns.md** - Agent-as-tool, memory, streaming, error recovery
 - **triage-pattern.md** - Detailed guide to triage pattern best practices
 - **mcp-integration.md** - Model Context Protocol (MCP) server integration
+
+**Advanced Patterns:**
+- **human-in-the-loop.md** - Human approval workflows for sensitive operations
+- **guardrails.md** - Input/output validation and safety checks
+- **parallelization.md** - Running multiple agents in parallel
+- **structured-outputs.md** - JSON schema outputs and Zod validation
+- **built-in-tools.md** - Using web search, file search, and computer automation tools
 
 ### Templates (`templates/`)
 
