@@ -13,6 +13,7 @@ A Claude Code plugin by **AGP** that helps non-developers create AI agents using
 - **Complete Project Structure**: Includes TypeScript config, dependencies, tests, and docs
 - **Built-in Verification**: Automatically validates generated code against SDK best practices
 - **OpenAI Strict Mode Compliance**: All generated code follows OpenAI's structured output requirements
+- **MCP Integration**: Support for Model Context Protocol (MCP) servers for external tool access
 
 ## Key Learnings from Real-World Usage
 
@@ -247,6 +248,7 @@ The plugin includes comprehensive examples and templates to help you get started
 - **multi-agent-with-handoffs.md** - Multi-agent triage pattern implementation
 - **advanced-patterns.md** - Agent-as-tool, memory, streaming, error recovery
 - **triage-pattern.md** - Detailed guide to triage pattern best practices
+- **mcp-integration.md** - Model Context Protocol (MCP) server integration
 
 ### Templates (`templates/`)
 

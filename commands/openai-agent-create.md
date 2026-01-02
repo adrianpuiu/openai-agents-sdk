@@ -541,6 +541,47 @@ Provide the user with:
 | "Research assistant that searches the web" | Agent with `searchWeb` tool |
 | "Data analyst that processes CSV files" | Agent with `processCSV` tool |
 | "Multi-agent: triage + specialists" | Triage agent with handoffs to specialists |
+| "Agent with external MCP tools" | Agent with MCP server integration |
+
+## MCP Integration Notes
+
+If the user mentions:
+- "External tools", "MCP", "MCP server", or "Model Context Protocol"
+- Need to connect to external APIs or services
+- Want to use hosted tools or streaming data
+
+Then generate MCP integration code. Key patterns:
+
+1. **HTTP MCP Servers** - For external API access
+2. **SSE MCP Servers** - For streaming responses
+3. **stdio MCP Servers** - For local MCP servers
+
+Example MCP tool wrapper:
+
+```typescript
+import { tool } from '@openai/agents';
+import { z } from 'zod';
+import { mcp } from '@openai/agents';
+
+const mcpServer = mcp.createServer({
+  type: 'http',
+  url: process.env.MCP_SERVER_URL || 'https://api.example.com/mcp',
+  headers: {
+    'Authorization': `Bearer ${process.env.MCP_API_KEY}`
+  }
+});
+
+export const mcpTool = tool({
+  description: 'External tool from MCP server',
+  parameters: z.object({
+    input: z.string().describe('Input for the MCP tool')
+  }),
+  execute: async ({ input }) => {
+    const result = await mcpServer.callTool('tool_name', { input });
+    return JSON.stringify(result, null, 2);
+  }
+});
+```
 
 ---
 
