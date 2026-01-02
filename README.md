@@ -3,7 +3,7 @@
 A Claude Code plugin by **AGP** that helps non-developers create AI agents using the OpenAI Agents SDK for TypeScript (package: `@openai/agents`). Generate complete, working agent projects from natural language descriptions.
 
 **Marketplace**: agp-marketplace
-**Version**: Updated with real-world learnings (January 2025)
+**Version**: Updated with real-world learnings (January 2026)
 
 ## Features
 
