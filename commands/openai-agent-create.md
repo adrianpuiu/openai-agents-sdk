@@ -552,36 +552,52 @@ If the user mentions:
 
 Then generate MCP integration code. Key patterns:
 
-1. **HTTP MCP Servers** - For external API access
-2. **SSE MCP Servers** - For streaming responses
-3. **stdio MCP Servers** - For local MCP servers
+1. **MCPServerStreamableHttp** - For external API access (recommended)
+2. **MCPServerSSE** - For Server-Sent Events streaming
+3. **MCPServerStdio** - For local MCP servers
 
-Example MCP tool wrapper:
+Example MCP server setup:
 
 ```typescript
-import { tool } from '@openai/agents';
-import { z } from 'zod';
-import { mcp } from '@openai/agents';
+import { MCPServerStreamableHttp, Agent, run } from '@openai/agents';
 
-const mcpServer = mcp.createServer({
-  type: 'http',
-  url: process.env.MCP_SERVER_URL || 'https://api.example.com/mcp',
-  headers: {
-    'Authorization': `Bearer ${process.env.MCP_API_KEY}`
+// Create Streamable HTTP MCP server
+const mcpServer = new MCPServerStreamableHttp({
+  url: 'https://gitmcp.io/openai/codex',
+  name: 'GitMCP Server',
+  requestInit: {
+    headers: {
+      'Authorization': `Bearer ${process.env.MCP_API_KEY}`
+    }
   }
 });
 
-export const mcpTool = tool({
-  description: 'External tool from MCP server',
-  parameters: z.object({
-    input: z.string().describe('Input for the MCP tool')
-  }),
-  execute: async ({ input }) => {
-    const result = await mcpServer.callTool('tool_name', { input });
-    return JSON.stringify(result, null, 2);
-  }
+// Pass mcpServers to Agent
+const agent = new Agent({
+  name: 'MCP Assistant',
+  instructions: 'Use MCP tools to help users.',
+  mcpServers: [mcpServer],
 });
+
+// Always connect/close
+async function main() {
+  try {
+    await mcpServer.connect();
+    const result = await run(agent, 'Your message here');
+    console.log(result.finalOutput);
+  } finally {
+    await mcpServer.close();
+  }
+}
 ```
+
+**IMPORTANT TypeScript MCP Patterns:**
+- Import `MCPServerStreamableHttp`, `MCPServerStdio`, or `MCPServerSSE` from `@openai/agents`
+- Create server instances with `new MCPServer...()` (not `mcp.createServer()`)
+- Pass `mcpServers: [server]` to Agent (not `mcp_servers`)
+- Always call `await server.connect()` before use
+- Always call `await server.close()` when done (use try-finally)
+- Tools are automatically loaded from MCP servers
 
 ---
 

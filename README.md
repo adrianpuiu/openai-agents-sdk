@@ -25,6 +25,7 @@ This plugin incorporates lessons learned from actual OpenAI Agents SDK projects:
 2. **Tool Definition**: Must use `tool()` helper, not plain objects
 3. **Entry Point**: Use `run()` function, not `agents.run()`
 4. **Response Access**: Results are in `result.finalOutput`
+5. **Agent Creation**: Use `new Agent()` constructor or `Agent.create()` for handoffs
 
 ### Zod Schema Requirements (Strict Mode)
 
@@ -54,6 +55,37 @@ handoff(agent, { toolDescriptionOverride: '...' })
 // NOT this
 handoff({ to: agent, ... })
 ```
+
+### MCP Integration (TypeScript SDK)
+
+The TypeScript SDK uses a different MCP pattern than Python:
+
+```typescript
+// Import MCP server classes
+import { MCPServerStreamableHttp, MCPServerStdio, MCPServerSSE } from '@openai/agents';
+
+// Create server instance (not mcp.createServer())
+const mcpServer = new MCPServerStreamableHttp({
+  url: 'https://gitmcp.io/openai/codex',
+  name: 'GitMCP Server',
+});
+
+// Pass to agent
+const agent = new Agent({
+  name: 'Assistant',
+  mcpServers: [mcpServer],  // Note: mcpServers (not mcp_servers)
+});
+
+// Always connect/close
+await mcpServer.connect();
+// ... use agent ...
+await mcpServer.close();
+```
+
+**MCP Server Types:**
+- `MCPServerStreamableHttp` - HTTP with streaming (recommended for remote servers)
+- `MCPServerSSE` - Server-Sent Events
+- `MCPServerStdio` - Local stdio communication
 
 ## Components
 
