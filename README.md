@@ -1,11 +1,6 @@
-[![Run in Smithery](https://smithery.ai/badge/skills/adrianpuiu)](https://smithery.ai/skills?ns=adrianpuiu&utm_source=github&utm_medium=badge)
-
 # OpenAI Agents SDK Plugin
 
-A Claude Code plugin by **AGP** that helps non-developers create AI agents using the OpenAI Agents SDK for TypeScript (package: `@openai/agents`). Generate complete, working agent projects from natural language descriptions.
-
-**Marketplace**: agp-marketplace
-**Version**: Updated with real-world learnings (January 2026)
+A Claude Code plugin that helps non-developers create AI agents using the OpenAI Agents SDK for TypeScript (package: `@openai/agents`). Generate complete, working agent projects from natural language descriptions.
 
 ## Features
 
@@ -15,7 +10,6 @@ A Claude Code plugin by **AGP** that helps non-developers create AI agents using
 - **Complete Project Structure**: Includes TypeScript config, dependencies, tests, and docs
 - **Built-in Verification**: Automatically validates generated code against SDK best practices
 - **OpenAI Strict Mode Compliance**: All generated code follows OpenAI's structured output requirements
-- **MCP Integration**: Support for Model Context Protocol (MCP) servers for external tool access
 
 ## Key Learnings from Real-World Usage
 
@@ -27,21 +21,63 @@ This plugin incorporates lessons learned from actual OpenAI Agents SDK projects:
 2. **Tool Definition**: Must use `tool()` helper, not plain objects
 3. **Entry Point**: Use `run()` function, not `agents.run()`
 4. **Response Access**: Results are in `result.finalOutput`
-5. **Agent Creation**: Use `new Agent()` constructor or `Agent.create()` for handoffs
-6. **Streaming Events**: Use `run(agent, message, { stream: true })` and handle `raw_model_stream_event` for real-time output
-7. **Text Delta Path**: Text deltas are in `event.data.delta` (string) when `event.data.type === 'output_text_delta'`
-8. **Agent Updated Event**: Use `agent_updated_stream_event` to track agent changes during handoffs
 
-### Zod Schema Requirements (Strict Mode)
+### Zod Schema Requirements (Critical!)
 
-OpenAI's API uses **strict mode** for structured outputs, which means:
+**IMPORTANT: Always use Zod schemas for tool parameters. Never use manual JSON Schema objects.**
+
+OpenAI's API uses **strict mode** for structured outputs. The `tool()` helper from `@openai/agents` requires Zod schemas:
 
 | ❌ AVOID | ✅ USE | Reason |
 |---------|---------|---------|
-| `z.optional()` | Required fields | All fields must be required |
+| Manual JSON Schema with `as any` | `z.object({...})` | Zod provides proper type inference and validation |
+| `strict: true` on parameters | Zod schema directly | Manual schema causes parameter parsing failures |
+| `z.optional()` | Required fields | All fields must be required in strict mode |
 | `z.url()` | `z.string()` + description | "uri" format not supported |
 | `z.any()` | `z.string()` for JSON | Schema must have type key |
 | `.default()` | Always required | No defaults in strict mode |
+
+**Why Zod is mandatory:**
+- Type inference: Parameters are automatically typed in the execute function
+- Runtime validation: Invalid inputs are caught before execution
+- Proper schema communication: The AI model receives correctly formatted schemas
+- No type casting needed: Eliminates dangerous `as any` casts
+
+**Example of correct tool definition:**
+```typescript
+import { tool } from '@openai/agents';
+import { z } from 'zod';
+
+export const myTool = tool({
+  description: 'Tool description here',
+  parameters: z.object({
+    action: z.enum(['add', 'list', 'format']).describe('Action to perform'),
+    data: z.string().describe('Data to process'),
+    count: z.number().default(5).describe('Number of items')  // default() works in Zod
+  }),
+  execute: async ({ action, data, count }) => {
+    // Parameters are properly typed - no casting needed
+    return { success: true, result: `${action}: ${data}` };
+  }
+});
+```
+
+**Common pitfall - manual JSON schema (DO NOT DO THIS):**
+```typescript
+// ❌ WRONG - Causes "Action: undefined" loops and parameter failures
+export const badTool = tool({
+  description: 'Tool description',
+  strict: true,  // Doesn't help with manual schemas
+  parameters: {
+    type: 'object',
+    properties: { action: { type: 'string' } },
+    required: ['action']
+  } as any,  // ⚠️ Dangerous! Bypasses type checking
+  execute: async (input: any) => {
+    // input.action will be undefined because schema isn't parsed correctly
+  }
+});
+```
 
 ### Environment Configuration
 
@@ -49,69 +85,6 @@ OpenAI's API uses **strict mode** for structured outputs, which means:
 // Load environment variables BEFORE SDK imports
 import 'dotenv/config';
 import { run } from '@openai/agents';
-```
-
-### Streaming Implementation
-
-```typescript
-import { run, MemorySession } from '@openai/agents';
-
-// Enable streaming
-const streamResult = await run(agent, message, {
-  stream: true,
-  maxTurns: 10,
-  agentHooks: { /* hooks */ },
-  inputGuardrails: [ /* guardrails */ ]
-});
-
-// Process stream events
-for await (const event of streamResult) {
-  switch (event.type) {
-    case 'agent_updated_stream_event':
-      // Agent changed (handoff)
-      console.log(`Agent: ${event.agent.name}`);
-      break;
-
-    case 'raw_model_stream_event':
-      // Text delta from model
-      if (event.data?.type === 'output_text_delta' && typeof event.data.delta === 'string') {
-        process.stdout.write(event.data.delta); // Stream in real-time
-      }
-      break;
-
-    case 'run_handoff_stream_event':
-      // Handoff occurred
-      console.log(`Handoff: ${event.currentAgent.name} → ${event.targetAgent.name}`);
-      break;
-
-    case 'input_guardrail_tripwire_triggered_stream_event':
-      // Guardrail blocked input
-      const response = event.tripwireTriggeredData.responseData;
-      console.error(`Blocked: ${response.refusalReason}`);
-      return;
-  }
-}
-```
-
-**Key Streaming Event Types:**
-- `agent_updated_stream_event` - Agent changed during execution
-- `raw_model_stream_event` - Model response chunks (check `event.data.type === 'output_text_delta'`)
-- `run_handoff_stream_event` - Agent handoff occurred
-- `run_tool_call_stream_event` - Tool was called
-- `input_guardrail_tripwire_triggered_stream_event` - Guardrail blocked input
-
-### Session Management
-
-```typescript
-import { MemorySession } from '@openai/agents';
-
-// Create a session for conversation context
-const session = new MemorySession();
-
-// Pass to run() for multi-turn conversations
-const result = await run(agent, message, { session });
-
-// Session maintains context across requests automatically
 ```
 
 ### Handoff Syntax
@@ -123,37 +96,6 @@ handoff(agent, { toolDescriptionOverride: '...' })
 // NOT this
 handoff({ to: agent, ... })
 ```
-
-### MCP Integration (TypeScript SDK)
-
-The TypeScript SDK uses a different MCP pattern than Python:
-
-```typescript
-// Import MCP server classes
-import { MCPServerStreamableHttp, MCPServerStdio, MCPServerSSE } from '@openai/agents';
-
-// Create server instance (not mcp.createServer())
-const mcpServer = new MCPServerStreamableHttp({
-  url: 'https://gitmcp.io/openai/codex',
-  name: 'GitMCP Server',
-});
-
-// Pass to agent
-const agent = new Agent({
-  name: 'Assistant',
-  mcpServers: [mcpServer],  // Note: mcpServers (not mcp_servers)
-});
-
-// Always connect/close
-await mcpServer.connect();
-// ... use agent ...
-await mcpServer.close();
-```
-
-**MCP Server Types:**
-- `MCPServerStreamableHttp` - HTTP with streaming (recommended for remote servers)
-- `MCPServerSSE` - Server-Sent Events
-- `MCPServerStdio` - Local stdio communication
 
 ## Components
 
@@ -344,20 +286,10 @@ The plugin includes comprehensive examples and templates to help you get started
 
 ### Examples (`examples/`)
 
-**Core Patterns:**
 - **single-agent-with-tools.md** - Complete single agent with multiple tools
 - **multi-agent-with-handoffs.md** - Multi-agent triage pattern implementation
 - **advanced-patterns.md** - Agent-as-tool, memory, streaming, error recovery
 - **triage-pattern.md** - Detailed guide to triage pattern best practices
-- **mcp-integration.md** - Model Context Protocol (MCP) server integration
-- **streaming-cli.md** - **NEW**: Complete streaming CLI with sessions, guardrails, and hooks
-
-**Advanced Patterns:**
-- **human-in-the-loop.md** - Human approval workflows for sensitive operations
-- **guardrails.md** - Input/output validation and safety checks
-- **parallelization.md** - Running multiple agents in parallel
-- **structured-outputs.md** - JSON schema outputs and Zod validation
-- **built-in-tools.md** - Using web search, file search, and computer automation tools
 
 ### Templates (`templates/`)
 
@@ -377,6 +309,5 @@ MIT
 
 ## Author
 
-**AGP** - Created for the agp-marketplace.
-Updated with real-world learnings from building production multi-agent systems with the OpenAI Agents SDK.
+Created for the Claude Code plugins marketplace.
 

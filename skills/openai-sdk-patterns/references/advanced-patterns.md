@@ -1,5 +1,9 @@
 # Advanced OpenAI Agent Patterns
 
+> **CRITICAL REMINDER**: All tools must use the `tool()` helper with Zod schemas.
+> Never use manual JSON Schema objects - they cause parameter parsing failures and infinite loops.
+> See `agent-api.md` for proper tool definition syntax.
+
 ## Multi-Agent Orchestration
 
 ### Agent Network Pattern
@@ -74,16 +78,21 @@ const contextAccumulator = {
 ### Tool Chaining
 
 ```typescript
-const validateAndExecute = {
-  name: 'validate_and_execute',
+import { tool } from '@openai/agents';
+import { z } from 'zod';
+
+const validateAndExecute = tool({
   description: 'Validate input then execute action',
   parameters: z.object({
-    action: z.enum(['create', 'update', 'delete']),
-    data: z.record(z.any())
+    action: z.enum(['create', 'update', 'delete']).describe('Action to perform'),
+    data: z.string().describe('JSON string of data to validate and process')
   }),
   execute: async ({ action, data }) => {
+    // Parse JSON string to object
+    const parsedData = JSON.parse(data);
+
     // Validation step
-    const validation = await validateSchema(data);
+    const validation = await validateSchema(parsedData);
     if (!validation.valid) {
       return { error: validation.errors };
     }
@@ -91,14 +100,14 @@ const validateAndExecute = {
     // Execution step
     switch (action) {
       case 'create':
-        return await createRecord(data);
+        return await createRecord(parsedData);
       case 'update':
-        return await updateRecord(data);
+        return await updateRecord(parsedData);
       case 'delete':
-        return await deleteRecord(data.id);
+        return await deleteRecord(parsedData.id);
     }
   }
-};
+});
 ```
 
 ## Error Handling
@@ -106,10 +115,14 @@ const validateAndExecute = {
 ### Graceful Tool Failures
 
 ```typescript
-const robustTool = {
-  name: 'robust_operation',
+import { tool } from '@openai/agents';
+import { z } from 'zod';
+
+const robustTool = tool({
   description: 'Operation with comprehensive error handling',
-  parameters: z.object({ input: z.string() }),
+  parameters: z.object({
+    input: z.string().describe('Input to process')
+  }),
   execute: async ({ input }) => {
     try {
       const result = await performOperation(input);
@@ -128,7 +141,7 @@ const robustTool = {
       };
     }
   }
-};
+});
 
 function isRetryable(error: unknown): boolean {
   return error instanceof RetryableError;
@@ -154,32 +167,34 @@ for await (const chunk of response) {
 ### Agent as Tool Pattern
 
 ```typescript
+import { tool, Agent, agents } from '@openai/agents';
+import { z } from 'zod';
+
 const specialist = new Agent({
   name: 'specialist',
   instructions: 'Deep expertise in specific domain',
   tools: [specializedDatabaseTool]
 });
 
+// Use tool() helper to wrap agent calls
+const consultSpecialistTool = tool({
+  description: 'Get specialist input on complex questions',
+  parameters: z.object({
+    question: z.string().describe('The question to ask the specialist')
+  }),
+  execute: async ({ question }) => {
+    const result = await agents.run({
+      agent: specialist,
+      message: question
+    });
+    return { answer: result.output };
+  }
+});
+
 const generalist = new Agent({
   name: 'generalist',
   instructions: 'Handle general queries, delegate when needed',
-  tools: [
-    // Use agent as a tool
-    {
-      name: 'consult_specialist',
-      description: 'Get specialist input',
-      parameters: z.object({
-        question: z.string()
-      }),
-      execute: async ({ question }) => {
-        const result = await agents.run({
-          agent: specialist,
-          message: question
-        });
-        return result.output;
-      }
-    }
-  ]
+  tools: [consultSpecialistTool]
 });
 ```
 
@@ -188,6 +203,9 @@ const generalist = new Agent({
 ### Persistent Conversation Memory
 
 ```typescript
+import { tool } from '@openai/agents';
+import { z } from 'zod';
+
 class AgentMemory {
   private store = new Map<string, any>();
 
@@ -204,17 +222,17 @@ class AgentMemory {
   }
 }
 
-const memoryTool = {
-  name: 'remember',
-  description: 'Store information for later use',
+const memoryTool = tool({
+  description: 'Store information for later use in the conversation',
   parameters: z.object({
-    key: z.string(),
-    value: z.any()
+    key: z.string().describe('The key to store the value under'),
+    value: z.string().describe('The value to store (use JSON for complex data)')
   }),
-  execute: async ({ key, value }, context) => {
-    const memory = context.memory as AgentMemory;
+  execute: async ({ key, value }) => {
+    // Note: context passing varies by implementation
+    // This is a simplified example
     memory.set(key, value);
     return { stored: true, key };
   }
-};
+});
 ```

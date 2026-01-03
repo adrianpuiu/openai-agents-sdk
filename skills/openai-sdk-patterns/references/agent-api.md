@@ -28,31 +28,80 @@ const agent = new Agent({
 
 ## Tool Definition
 
-### Tool Interface
+**CRITICAL: Always use the `tool()` helper with Zod schemas. Never define tools as plain objects with manual JSON schemas.**
+
+### Tool Interface (using `tool()` helper)
 
 ```typescript
-interface Tool<T extends z.ZodType> {
-  name: string;
-  description: string;
-  parameters: T;
-  execute: (params: z.infer<T>) => Promise<any>;
-}
+import { tool } from '@openai/agents';
+import { z } from 'zod';
+
+// ✅ CORRECT - Using tool() helper with Zod schema
+const myTool = tool({
+  description: 'Tool description',
+  parameters: z.object({
+    param1: z.string().describe('First parameter'),
+    param2: z.number().describe('Second parameter')
+  }),
+  execute: async ({ param1, param2 }) => {
+    // Implementation - parameters are properly typed
+    return { result: 'done' };
+  }
+});
 ```
 
-### Example
+### Why Use `tool()` Helper?
+
+| Feature | `tool()` Helper | Plain Object |
+|---------|----------------|--------------|
+| Type Safety | Full inference | Manual typing required |
+| Runtime Validation | Automatic | None |
+| AI Schema Communication | Proper format | May fail |
+| Required Casts | None | Needs `as any` |
+| Parameter Parsing | Built-in | Manual in execute |
+
+### Common Pitfall - Manual JSON Schema (DO NOT USE)
 
 ```typescript
-const searchTool: Tool<z.ZodObject<{query: z.ZodString}>> = {
-  name: 'search',
-  description: 'Search the web for information',
-  parameters: z.object({
-    query: z.string().describe('Search query')
-  }),
-  execute: async ({ query }) => {
-    // Implementation
-    return results;
+// ❌ WRONG - Causes parameter parsing failures
+const badTool = {
+  name: 'bad_tool',
+  description: 'This will fail',
+  parameters: {
+    type: 'object',
+    properties: { action: { type: 'string' } },
+    required: ['action']
+  } as any,  // ⚠️ Dangerous!
+  execute: async (input: any) => {
+    // input.action will be undefined - loop occurs!
   }
 };
+```
+
+### Example: Correct Tool with All Features
+
+```typescript
+import { tool } from '@openai/agents';
+import { z } from 'zod';
+
+const searchTool = tool({
+  description: 'Search the web for information and return relevant results',
+  parameters: z.object({
+    query: z.string().min(1).describe('The search query to execute'),
+    numResults: z.number().min(1).max(20).default(5).describe('Number of results to return (1-20)')
+  }),
+  execute: async ({ query, numResults }) => {
+    // Parameters are fully typed: query is string, numResults is number
+    console.log(`Searching: "${query}" for ${numResults} results`);
+
+    // Your implementation here
+    return {
+      query,
+      results: [],
+      count: 0
+    };
+  }
+});
 ```
 
 ## Handoff Function
