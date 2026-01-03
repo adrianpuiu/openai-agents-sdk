@@ -1,3 +1,5 @@
+[![Run in Smithery](https://smithery.ai/badge/skills/adrianpuiu)](https://smithery.ai/skills?ns=adrianpuiu&utm_source=github&utm_medium=badge)
+
 # OpenAI Agents SDK Plugin
 
 A Claude Code plugin by **AGP** that helps non-developers create AI agents using the OpenAI Agents SDK for TypeScript (package: `@openai/agents`). Generate complete, working agent projects from natural language descriptions.
