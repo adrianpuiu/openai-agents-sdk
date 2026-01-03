@@ -7,8 +7,5 @@
     "skipLibCheck": true,
     "esModuleInterop": true
   },
-  "files": [],
-  "references": [
-    { "path": "./src" }
-  ]
+  "include": ["**/*.ts"]
 }

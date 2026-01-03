@@ -1,5 +1,5 @@
-import { Agent } from 'openai-agents-sdk';
-import { lookupOrder, processReturn, escalateToHuman } from '../tools';
+import { Agent } from '@openai/agents';
+import { lookupOrder, processReturn, escalateToHuman } from '../tools/index.js';
 
 export const supportAgent = new Agent({
   name: '{{AGENT_NAME}}',

@@ -1,3 +1,4 @@
+import { tool } from '@openai/agents';
 import { z } from 'zod';
 
 /**
@@ -7,11 +8,10 @@ import { z } from 'zod';
  * TODO: Implement proper error handling
  * TODO: Add authentication/authorization checks
  */
-export const lookupOrder = {
-  name: 'lookup_order',
+export const lookupOrder = tool({
   description: '{{DESCRIPTION}}',
   parameters: z.object({
-    orderId: z.string().min(1).describe('{{PARAM_DESCRIPTION}}')
+    orderId: z.string().describe('{{PARAM_DESCRIPTION}}')
   }),
   execute: async ({ orderId }) => {
     // TODO: {{TODO_IMPLEMENTATION}}
@@ -19,14 +19,14 @@ export const lookupOrder = {
 
     console.log(`Looking up order: ${orderId}`);
 
-    // Placeholder response
-    return {
+    // Placeholder response - return JSON string
+    return JSON.stringify({
       orderId,
       status: 'shipped',
       items: [],
       trackingNumber: '',
       orderDate: new Date().toISOString().split('T')[0],
       total: 0
-    };
+    }, null, 2);
   }
-};
+});

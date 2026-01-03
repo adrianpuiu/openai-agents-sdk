@@ -2,6 +2,8 @@
 
 {{DESCRIPTION}}
 
+Built with the OpenAI Agents SDK for TypeScript (`@openai/agents`).
+
 ## Setup
 
 1. Install dependencies:
@@ -47,3 +49,11 @@ npm run typecheck  # Check types
 Edit the following files to customize:
 - `src/agents/support-agent.ts` - Agent instructions and behavior
 - `src/tools/` - Tool implementations
+
+## Architecture
+
+This agent uses:
+- **@openai/agents**: OpenAI Agents SDK for TypeScript
+- **tool() helper**: Defines tools with proper Zod schemas
+- **streaming**: Real-time token streaming for responses
+- **tsx**: Fast TypeScript execution for ES modules

@@ -13,35 +13,44 @@ Your verification should prioritize SDK functionality and best practices over ge
 
 ### 1. SDK Installation and Configuration
 
-- Verify `openai-agents-sdk` is installed in package.json dependencies
-- Check that the SDK version is reasonably current (not ancient)
+- Verify `@openai/agents` is installed in package.json dependencies (NOT `openai-agents-sdk`)
+- Check that the SDK version is reasonably current (0.3.x or higher)
 - Confirm package.json has `"type": "module"` for ES modules support
 - Validate that Node.js version requirements are met (check package.json engines field if present)
+- Ensure `tsx` is used instead of `ts-node` for TypeScript execution
+- Check that `dotenv` is installed for environment variable loading
 
 ### 2. TypeScript Configuration
 
 - Verify tsconfig.json exists and has appropriate settings for the SDK
-- Check module resolution settings (should support ES modules, "bundler" recommended)
+- Check module resolution is set to `"bundler"` (recommended for @openai/agents)
 - Ensure target is ES2022 or higher for the SDK
 - Validate that compilation settings won't break SDK imports
+- Check for project references structure (root tsconfig references src/tsconfig)
 
 ### 3. SDK Usage and Patterns
 
-- Verify correct imports from `openai-agents-sdk`
-- Check that agents are properly initialized using `new Agent()` constructor
+- Verify correct imports from `@openai/agents`
+- Check that `import 'dotenv/config'` is the FIRST import in index.ts
+- Verify agents are properly initialized using `new Agent()` constructor
 - Validate agent configuration includes required fields (name, instructions)
-- Ensure tools are correctly defined with Zod schemas
-- Check handoffs are properly defined using `handoff()` function
-- Verify `agents.run()` is used correctly for executing agents
-- Check for proper error handling around SDK calls
+- Ensure tools are defined using `tool()` helper (NOT plain objects)
+- Check handoffs use correct syntax: `handoff(agent, { toolDescriptionOverride })`
+- Verify `run()` function is used (NOT `agents.run()`)
+- Check for streaming implementation: `run(agent, message, { stream: true })`
+- Verify correct streaming event handling: `raw_model_stream_event`
+- Check text delta access: `event.data.delta` (string) when `event.data.type === 'output_text_delta'`
 
-### 4. Tool Implementation
+### 4. Tool Implementation (Critical: Strict Mode Compliance)
 
-- Verify tools have required properties: name, description, parameters, execute
+- Verify tools use `tool()` helper from `@openai/agents`
 - Check parameters use Zod schemas for validation
-- Ensure execute functions are async and return proper values
-- Validate tool naming uses snake_case
+- **CRITICAL**: All Zod parameters must be required (NO `.optional()`)
+- **CRITICAL**: Do NOT use `z.url()` - use `z.string()` with description instead
+- **CRITICAL**: Do NOT use `z.any()` - use `z.string()` for JSON data
+- Ensure execute functions are async and return `JSON.stringify(result, null, 2)`
 - Check tool descriptions are clear and specific
+- Verify tool naming uses camelCase (not snake_case)
 
 ### 5. Type Safety and Compilation
 
@@ -52,8 +61,8 @@ Your verification should prioritize SDK functionality and best practices over ge
 
 ### 6. Scripts and Build Configuration
 
-- Verify package.json has necessary scripts (start, typecheck)
-- Check that scripts are correctly configured for TypeScript/ES modules
+- Verify package.json has necessary scripts (start with tsx, typecheck)
+- Check that scripts use `tsx` instead of `ts-node` or `node --loader`
 - Validate that the application can be built and run
 
 ### 7. Environment and Security
@@ -66,10 +75,11 @@ Your verification should prioritize SDK functionality and best practices over ge
 ### 8. SDK Best Practices
 
 - Agent instructions are clear and well-structured
-- Tools have appropriate Zod validation schemas
-- Handoffs use clear descriptions for when to trigger
+- Tools use `tool()` helper with proper Zod schemas
+- Handoffs use `handoff(agent, options)` syntax (NOT `handoff({ to: agent })`)
 - Code follows modern TypeScript patterns
-- Entry point (index.ts) properly initializes and runs agents
+- Entry point (index.ts) has `import 'dotenv/config'` as first import
+- Imports use `.js` extensions for ES modules
 
 ### 9. Functionality Validation
 
@@ -98,6 +108,7 @@ Your verification should prioritize SDK functionality and best practices over ge
 ```
 - package.json
 - tsconfig.json
+- src/tsconfig.json (if using project references)
 - src/agents/*.ts
 - src/tools/*.ts
 - src/index.ts
@@ -110,7 +121,7 @@ Your verification should prioritize SDK functionality and best practices over ge
 
 Use WebFetch or WebSearch to reference the official OpenAI documentation:
 - https://platform.openai.com/docs/agents
-- https://www.npmjs.com/package/openai-agents-sdk
+- https://www.npmjs.com/package/@openai/agents
 
 Compare the implementation against official patterns and recommendations. Note any deviations from documented best practices.
 
@@ -123,6 +134,20 @@ Execute `npx tsc --noEmit` to verify no type errors. Report any compilation issu
 - Verify SDK methods are used correctly
 - Check that configuration options match SDK patterns
 - Validate that patterns follow official examples
+
+## Common Issues to Check For
+
+| Issue | Symptom | Fix |
+|-------|---------|-----|
+| Wrong package name | `openai-agents-sdk` in imports | Use `@openai/agents` |
+| Not using tool() helper | Plain objects for tools | Use `tool({ description, parameters, execute })` |
+| Optional parameters | `.optional()` in Zod schemas | All fields must be required |
+| Using z.url() | "uri is not a valid format" | Use `z.string()` with description |
+| Using z.any() | Schema validation errors | Use `z.string()` for JSON data |
+| Wrong event type | `run_raw_model_stream_event` | Use `raw_model_stream_event` |
+| Wrong delta path | `event.delta.text` | Use `event.data.delta` |
+| Missing dotenv | Credentials not found | Add `import 'dotenv/config'` as first import |
+| Using ts-node | ES module errors | Use `tsx` instead |
 
 ## Verification Report Format
 
@@ -139,11 +164,13 @@ Brief overview of findings (2-3 sentences)
 ### Critical Issues (if any)
 
 Issues that prevent the app from functioning:
-- SDK installation errors
+- Wrong package name (`openai-agents-sdk` instead of `@openai/agents`)
 - Type errors or compilation failures
 - Missing required configuration
 - Security problems (hardcoded API keys)
 - Incorrect SDK usage that will cause runtime failures
+- Not using `tool()` helper for tools
+- Zod schema violations (`.optional()`, `.url()`, `z.any()`)
 
 ### Warnings (if any)
 
@@ -152,6 +179,7 @@ Issues that prevent the app from functioning:
 - Deviations from SDK documentation recommendations
 - Missing documentation or setup files
 - Tools without proper implementation
+- Not using streaming for responses
 
 ### Passed Checks
 
@@ -176,7 +204,7 @@ Be thorough but constructive. Focus on helping the developer build a functional,
 ### Overall Status: PASS WITH WARNINGS
 
 ### Summary
-The OpenAI agent project is well-structured and follows SDK patterns correctly.
+The OpenAI agent project is well-structured and follows most SDK patterns correctly.
 TypeScript compilation passes. Minor issues with tool implementations need attention.
 
 ### Critical Issues
@@ -184,23 +212,25 @@ None
 
 ### Warnings
 - lookupOrder tool has TODO placeholder implementation
-- .env.example missing OPENAI_API_KEY
-- No README.md with setup instructions
+- Not using streaming for responses (consider adding for better UX)
+- Missing input guardrails for validation
 
 ### Passed Checks
-- ✅ openai-agents-sdk v1.2.3 installed
+- ✅ @openai/agents v0.3.7 installed
 - ✅ package.json has type: "module"
-- ✅ tsconfig.json properly configured
+- ✅ tsconfig.json properly configured with bundler resolution
 - ✅ Agent uses correct new Agent() constructor
-- ✅ Tools have proper Zod schemas
+- ✅ Tools use tool() helper with proper Zod schemas
+- ✅ All parameters are required (no .optional())
 - ✅ TypeScript compilation passes (tsc --noEmit)
 - ✅ .env in .gitignore
+- ✅ dotenv/config imported first in index.ts
 
 ### Recommendations
 1. Implement the lookupOrder tool logic
-2. Add OPENAI_API_KEY to .env.example
-3. Create README.md with setup instructions
-4. Consider adding error handling for API failures
+2. Consider adding streaming for real-time responses
+3. Add input guardrails for user input validation
+4. Consider adding agent hooks for monitoring
 ```
 
 ---

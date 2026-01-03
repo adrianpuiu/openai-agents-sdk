@@ -1,15 +1,38 @@
-import { agents } from 'openai-agents-sdk';
-import { supportAgent } from './agents/support-agent';
+import 'dotenv/config';
+import { run } from '@openai/agents';
+import { supportAgent } from './agents/support-agent.js';
 
 async function main() {
-  const message = process.argv[2] || 'Hello! How can I help you today?';
+  const message = process.argv.slice(2).join(' ') || 'Hello! How can I help you today?';
 
-  const response = await agents.run({
-    agent: supportAgent,
-    message
+  console.log(`\n🤖 {{AGENT_NAME}}: "${message}"\n`);
+
+  // Run with streaming for real-time output
+  const streamResult = await run(supportAgent, message, {
+    stream: true,
+    maxTurns: 10
   });
 
-  console.log(response.output);
+  for await (const event of streamResult) {
+    switch (event.type) {
+      case 'raw_model_stream_event':
+        // Stream text tokens in real-time
+        if (event.data?.type === 'output_text_delta' && typeof event.data.delta === 'string') {
+          process.stdout.write(event.data.delta);
+        }
+        break;
+
+      case 'run_tool_call_stream_event':
+        console.log('\n[tool: ' + event.toolName + ']');
+        break;
+
+      case 'agent_updated_stream_event':
+        console.log('\n[agent: ' + event.agent.name + ']');
+        break;
+    }
+  }
+
+  console.log('\n');
 }
 
 main().catch(console.error);

@@ -1,3 +1,4 @@
+import { tool } from '@openai/agents';
 import { z } from 'zod';
 
 /**
@@ -6,8 +7,7 @@ import { z } from 'zod';
  * TODO: Integrate with your human agent notification system
  * TODO: Include conversation context in escalation
  */
-export const escalateToHuman = {
-  name: 'escalate_to_human',
+export const escalateToHuman = tool({
   description: 'Escalate the conversation to a human agent when the issue cannot be resolved automatically',
   parameters: z.object({
     reason: z.string().describe('Reason for escalation'),
@@ -19,11 +19,11 @@ export const escalateToHuman = {
 
     console.log(`Escalating to human (urgency: ${urgency}): ${reason}`);
 
-    return {
+    return JSON.stringify({
       escalated: true,
       ticketId: `TICKET-${Date.now()}`,
       estimatedWaitTime: '5-10 minutes',
       message: 'A human agent will be with you shortly.'
-    };
+    }, null, 2);
   }
-};
+});

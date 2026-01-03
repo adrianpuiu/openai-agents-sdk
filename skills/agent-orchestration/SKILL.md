@@ -1,6 +1,6 @@
 ---
 name: agent-orchestration
-description: Use when implementing agent handoffs, multi-agent coordination, or agent-to-agent communication with OpenAI Agents SDK. Use when one agent needs to transfer control to another agent based on context, user intent, or task requirements.
+description: Use when implementing agent handoffs, multi-agent coordination, or agent-to-agent communication with OpenAI Agents SDK (@openai/agents). Use when one agent needs to transfer control to another agent based on context, user intent, or task requirements. Covers handoff(), handoffs array, toolDescriptionOverride, and tracking handoffs with streaming events.
 ---
 
 # Agent Orchestration with Handoffs
@@ -29,7 +29,6 @@ digraph handoff_decision {
 **Use handoffs when:**
 - Agent lacks required tools or knowledge
 - Request requires different specialization
-- Human intervention is needed
 - Task delegation would improve efficiency
 
 **Don't use handoffs for:**
@@ -37,12 +36,12 @@ digraph handoff_decision {
 - Subtasks the agent can handle itself
 - Every request (creates unnecessary overhead)
 
-## Handoff Pattern
+## Handoff Pattern with @openai/agents
 
-### Basic Handoff
+### Correct Import and Syntax
 
 ```typescript
-import { Agent, handoff } from 'openai-agents-sdk';
+import { Agent, handoff } from '@openai/agents';
 
 // Create target agent
 const specialistAgent = new Agent({
@@ -50,10 +49,9 @@ const specialistAgent = new Agent({
   instructions: 'You handle specialized technical issues.'
 });
 
-// Create handoff
-const escalateToSpecialist = handoff({
-  to: specialistAgent,
-  description: 'Escalate to specialist when technical issues are beyond basic support'
+// Create handoff with correct syntax
+const escalateToSpecialist = handoff(specialistAgent, {
+  toolDescriptionOverride: 'Escalate to specialist when technical issues are beyond basic support'
 });
 
 // Use handoff in source agent
@@ -64,26 +62,17 @@ const generalAgent = new Agent({
 });
 ```
 
-### Handoff with Context Transfer
+**Critical syntax notes:**
+- Use `handoff(agent, options)` - NOT `handoff({ to: agent, ... })`
+- Use `toolDescriptionOverride` for clear routing
+- Add handoffs to the `handoffs` array in Agent config
 
-```typescript
-const escalateWithContext = handoff({
-  to: billingAgent,
-  description: 'Transfer to billing for payment issues',
-  // Pass additional context
-  context: {
-    reason: 'payment_processing',
-    escalationLevel: 'tier1'
-  }
-});
-```
-
-## Multi-Agent Triage Pattern
+### Multi-Agent Triage Pattern
 
 The most common orchestration pattern: a triage agent routes to specialists.
 
 ```typescript
-import { Agent, handoff, agents } from 'openai-agents-sdk';
+import { Agent, handoff } from '@openai/agents';
 
 // Triage agent - entry point
 const triageAgent = new Agent({
@@ -94,25 +83,17 @@ and route them to the appropriate specialist agent.
 Analyze the request and:
 - For product questions: handoff to productAgent
 - For technical issues: handoff to technicalAgent
-- For billing questions: handoff to billingAgent
-- For account issues: handoff to accountAgent`,
+- For billing questions: handoff to billingAgent`,
 
   handoffs: [
-    handoff({
-      to: productAgent,
-      description: 'Use for questions about products, features, or pricing'
+    handoff(productAgent, {
+      toolDescriptionOverride: 'Use for questions about products, features, or pricing'
     }),
-    handoff({
-      to: technicalAgent,
-      description: 'Use for technical support, bugs, or integrations'
+    handoff(technicalAgent, {
+      toolDescriptionOverride: 'Use for technical support, bugs, or integrations'
     }),
-    handoff({
-      to: billingAgent,
-      description: 'Use for invoices, payments, or subscriptions'
-    }),
-    handoff({
-      to: accountAgent,
-      description: 'Use for account settings, credentials, or access'
+    handoff(billingAgent, {
+      toolDescriptionOverride: 'Use for invoices, payments, or subscriptions'
     })
   ]
 });
@@ -127,7 +108,7 @@ const productAgent = new Agent({
 const technicalAgent = new Agent({
   name: 'technical',
   instructions: 'You provide technical support and troubleshooting.',
-  tools: [knowledgeBase, diagnosticTool, ticketCreator]
+  tools: [knowledgeBase, diagnosticTool]
 });
 
 const billingAgent = new Agent({
@@ -135,37 +116,56 @@ const billingAgent = new Agent({
   instructions: 'You handle billing inquiries and payment processing.',
   tools: [invoiceLookup, paymentProcessor]
 });
+```
 
-const accountAgent = new Agent({
-  name: 'account',
-  instructions: 'You help with account management and security.',
-  tools: [accountManager, passwordReset]
+## Tracking Handoffs with Streaming
+
+When using streaming, you can track when handoffs occur:
+
+```typescript
+import { run } from '@openai/agents';
+
+const streamResult = await run(triageAgent, 'I need to update my credit card', {
+  stream: true
 });
 
-// Run the triage system
-const response = await agents.run({
-  agent: triageAgent,
-  message: 'I need to update my credit card'
-});
+for await (const event of streamResult) {
+  switch (event.type) {
+    case 'agent_updated_stream_event':
+      // Agent changed (handoff occurred)
+      console.log(`[${event.agent.name}]`);
+      break;
+
+    case 'run_handoff_stream_event':
+      // Handoff occurred - shows source and target
+      console.log(`[handoff: ${event.currentAgent.name} → ${event.targetAgent.name}]`);
+      break;
+
+    case 'raw_model_stream_event':
+      // Text delta from model
+      if (event.data?.type === 'output_text_delta' && typeof event.data.delta === 'string') {
+        process.stdout.write(event.data.delta);
+      }
+      break;
+  }
+}
 ```
 
 ## Handoff Best Practices
 
 ### 1. Clear Descriptions
 
-The handoff description is critical—it tells the agent WHEN to use it.
+The `toolDescriptionOverride` tells the agent WHEN to use the handoff.
 
 ```typescript
 // ❌ Bad: Vague
-handoff({
-  to: supportAgent,
-  description: 'Transfer to support'
+handoff(supportAgent, {
+  toolDescriptionOverride: 'Transfer to support'
 })
 
 // ✅ Good: Specific
-handoff({
-  to: technicalSupportAgent,
-  description: 'Use when the user reports technical issues, bugs, or needs troubleshooting help beyond basic FAQ'
+handoff(technicalSupportAgent, {
+  toolDescriptionOverride: 'Use when the user reports technical issues, bugs, or needs troubleshooting help beyond basic FAQ'
 })
 ```
 
@@ -182,23 +182,7 @@ The user has already been helped by a general agent - focus on solving their spe
 });
 ```
 
-### 3. Context Preservation
-
-Pass relevant context to maintain conversation continuity:
-
-```typescript
-const escalateWithContext = handoff({
-  to: humanAgent,
-  description: 'Escalate to human agent',
-  context: (sourceContext) => ({
-    conversationHistory: sourceContext.history,
-    previousAttempts: sourceContext.attempts || 0,
-    userId: sourceContext.userId
-  })
-});
-```
-
-### 4. Handoff Limits
+### 3. One Handoff Per Request Pattern
 
 Prevent infinite handoff loops:
 
@@ -213,31 +197,31 @@ do NOT handoff again - handle the request yourself or inform the user you cannot
 });
 ```
 
-## Handoff Chaining
+### 4. Tool vs Handoff Decision
 
-For complex workflows, chain handoffs sequentially:
+**Use tools when:**
+- Calling a function or API
+- Performing data transformation
+- Accessing external systems
+
+**Use handoffs when:**
+- Transferring to another agent with different expertise
+- The task requires fundamentally different capabilities
+- You want to delegate the entire conversation
 
 ```typescript
-const level1Agent = new Agent({
-  name: 'level1',
-  instructions: 'Basic support',
-  handoffs: [
-    handoff({
-      to: level2Agent,
-      description: 'Escalate to level 2 when issue is unresolved'
-    })
-  ]
+// ✅ Tool: Function call
+const lookupOrder = tool({
+  description: 'Look up order status',
+  parameters: z.object({ orderId: z.string() }),
+  execute: async ({ orderId }) => {
+    return JSON.stringify(await db.lookupOrder(orderId));
+  }
 });
 
-const level2Agent = new Agent({
-  name: 'level2',
-  instructions: 'Advanced support',
-  handoffs: [
-    handoff({
-      to: specialistAgent,
-      description: 'Escalate to specialist for complex cases'
-    })
-  ]
+// ✅ Handoff: Agent transfer
+const escalateToBilling = handoff(billingAgent, {
+  toolDescriptionOverride: 'Use for billing disputes, payment issues, or refund requests'
 });
 ```
 
@@ -245,38 +229,45 @@ const level2Agent = new Agent({
 
 | Mistake | Fix |
 |---------|-----|
-| Vague handoff descriptions | Be specific about WHEN to use |
+| Wrong syntax `handoff({ to: agent })` | Use `handoff(agent, { toolDescriptionOverride })` |
+| Vague descriptions | Be specific about WHEN to use |
 | Too many handoffs | Keep agents focused, limit handoffs |
-| Not preserving context | Pass relevant context in handoff |
-| Handoff for everything | Use tools for function calls, handoffs for agent transfers |
+| Handoff for function calls | Use tools for functions, handoffs for agents |
 | Circular handoffs | Design clear hierarchy or specialization boundaries |
+| Not tracking handoffs in streaming | Use `run_handoff_stream_event` |
 
 ## Testing Handoffs
 
 Verify handoffs work correctly:
 
 ```typescript
+import { run } from '@openai/agents';
+
 // Test triage routing
 const tests = [
   { input: 'How much does it cost?', expected: 'productAgent' },
   { input: 'I found a bug', expected: 'technicalAgent' },
-  { input: 'I need a refund', expected: 'billingAgent' },
-  { input: 'Reset my password', expected: 'accountAgent' }
+  { input: 'I need a refund', expected: 'billingAgent' }
 ];
 
 for (const test of tests) {
-  const result = await agents.run({
-    agent: triageAgent,
-    message: test.input
-  });
-  console.log(`${test.input} -> ${result.handoff?.to || 'no handoff'}`);
+  const streamResult = await run(triageAgent, test.input, { stream: true });
+
+  // Track which agents were used
+  const agentsUsed = [];
+  for await (const event of streamResult) {
+    if (event.type === 'agent_updated_stream_event') {
+      agentsUsed.push(event.agent.name);
+    }
+  }
+
+  console.log(`${test.input} -> ${agentsUsed.join(' -> ')}`);
 }
 ```
 
 ## For More Details
 
 See `references/handoff-patterns.md` for advanced patterns including:
-- Conditional handoffs
-- Handoff callbacks and hooks
-- Multi-agent consensus patterns
 - Dynamic handoff routing
+- Handoff with context preservation
+- Multi-agent consensus patterns

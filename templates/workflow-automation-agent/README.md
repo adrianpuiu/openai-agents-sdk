@@ -1,6 +1,6 @@
 # Workflow Automation Agent Template
 
-A template for creating workflow automation agents using OpenAI Agents SDK.
+A template for creating workflow automation agents using OpenAI Agents SDK (`@openai/agents`).
 
 ## Structure
 
@@ -23,8 +23,8 @@ workflow-automation-agent/
 
 ```typescript
 // src/agents/workflow-agent.ts
-import { Agent } from 'openai-agents-sdk';
-import { createRecord, updateRecord, notifyUser } from '../tools';
+import { Agent } from '@openai/agents';
+import { createRecord, updateRecord, notifyUser } from '../tools/index.js';
 
 export const workflowAgent = new Agent({
   name: 'workflow-agent',
@@ -52,63 +52,63 @@ Log all actions taken for audit purposes.`,
 
 ```typescript
 // src/tools/createRecord.ts
+import { tool } from '@openai/agents';
 import { z } from 'zod';
 
-export const createRecord = {
-  name: 'create_record',
+export const createRecord = tool({
   description: 'Create a new record in the system',
   parameters: z.object({
     recordType: z.string().describe('Type of record to create'),
-    data: z.record(z.any()).describe('Record data')
+    data: z.string().describe('JSON string containing record data')
   }),
   execute: async ({ recordType, data }) => {
     // TODO: Connect to your database or API
     console.log(`Creating ${recordType} record:`, data);
 
-    return {
+    return JSON.stringify({
       success: true,
       recordId: `REC-${Date.now()}`,
       createdAt: new Date().toISOString()
-    };
+    }, null, 2);
   }
-};
+});
 ```
 
 ### Update Record Tool
 
 ```typescript
 // src/tools/updateRecord.ts
+import { tool } from '@openai/agents';
 import { z } from 'zod';
 
-export const updateRecord = {
-  name: 'update_record',
+export const updateRecord = tool({
   description: 'Update an existing record in the system',
   parameters: z.object({
     recordId: z.string().describe('ID of record to update'),
-    updates: z.record(z.any()).describe('Fields to update')
+    updates: z.string().describe('JSON string containing fields to update')
   }),
   execute: async ({ recordId, updates }) => {
     // TODO: Connect to your database or API
     console.log(`Updating record ${recordId}:`, updates);
 
-    return {
+    return JSON.stringify({
       success: true,
       recordId,
       updatedAt: new Date().toISOString(),
-      fieldsUpdated: Object.keys(updates)
-    };
+      fieldsUpdated: []
+    }, null, 2);
   }
-};
+});
 ```
 
 ### Notify User Tool
 
 ```typescript
 // src/tools/notifyUser.ts
+import { tool } from '@openai/agents';
 import { z } from 'zod';
 
-export const notifyUser = {
-  name: 'notify_user',
+export const notifyUser = tool({
   description: 'Send a notification to a user via email, Slack, or other channel',
   parameters: z.object({
     recipient: z.string().describe('User ID or email address'),
@@ -121,15 +121,43 @@ export const notifyUser = {
     // Options: SendGrid, Slack Webhook, Twilio
     console.log(`Sending ${channel} notification to ${recipient}`);
 
-    return {
+    return JSON.stringify({
       sent: true,
       notificationId: `NOTIF-${Date.now()}`,
       channel,
       recipient,
       sentAt: new Date().toISOString()
-    };
+    }, null, 2);
   }
-};
+});
+```
+
+## Entry Point Template
+
+```typescript
+// src/index.ts
+import 'dotenv/config';
+import { run } from '@openai/agents';
+import { workflowAgent } from './agents/workflow-agent.js';
+
+async function main() {
+  const message = process.argv.slice(2).join(' ');
+
+  const streamResult = await run(workflowAgent, message, {
+    stream: true,
+    maxTurns: 10
+  });
+
+  for await (const event of streamResult) {
+    if (event.type === 'raw_model_stream_event') {
+      if (event.data?.type === 'output_text_delta' && typeof event.data.delta === 'string') {
+        process.stdout.write(event.data.delta);
+      }
+    }
+  }
+}
+
+main().catch(console.error);
 ```
 
 ## Usage
@@ -158,8 +186,8 @@ if (requiresApproval(action)) {
 ### Multi-Step Workflow
 ```typescript
 // Agent executes steps in sequence
-const step1 = await createRecord({ recordType: 'request', data: initialData });
-const step2 = await updateRecord({ recordId: step1.recordId, updates: { status: 'pending' } });
+const step1 = await createRecord({ recordType: 'request', data: JSON.stringify(initialData) });
+const step2 = await updateRecord({ recordId: step1.recordId, updates: JSON.stringify({ status: 'pending' }) });
 const step3 = await notifyUser({ recipient: requester, channel: 'email', subject: 'Request received', message: 'Your request is pending approval' });
 ```
 
@@ -172,3 +200,12 @@ if (data.priority === 'urgent') {
   await notifyUser({ recipient: regularTeam, channel: 'email', subject: 'New request', message: data.summary });
 }
 ```
+
+## Key Patterns
+
+- Use `tool()` helper for all tools (not plain objects)
+- Import from `@openai/agents` (not `openai-agents-sdk`)
+- Return `JSON.stringify(result, null, 2)` from tools
+- Use `.js` extensions for imports in ES modules
+- All Zod parameters must be required (no `.optional()`, no `z.any()`)
+- Use `z.string()` for JSON data instead of `z.record(z.any())`

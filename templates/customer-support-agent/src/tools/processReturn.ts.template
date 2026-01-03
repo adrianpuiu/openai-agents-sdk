@@ -1,3 +1,4 @@
+import { tool } from '@openai/agents';
 import { z } from 'zod';
 
 /**
@@ -7,8 +8,7 @@ import { z } from 'zod';
  * TODO: Implement return label generation
  * TODO: Add validation for return eligibility
  */
-export const processReturn = {
-  name: 'process_return',
+export const processReturn = tool({
   description: '{{DESCRIPTION}}',
   parameters: z.object({
     orderId: z.string().describe('The order ID to process return for'),
@@ -19,13 +19,13 @@ export const processReturn = {
     // TODO: {{TODO_IMPLEMENTATION}}
     console.log(`Processing return for order ${orderId}:`, { reason, items });
 
-    // Placeholder response
-    return {
+    // Placeholder response - return JSON string
+    return JSON.stringify({
       success: true,
       returnLabel: `RETURN-${Date.now()}`,
       refundAmount: 0,
       refundDate: new Date().toISOString().split('T')[0],
       instructions: 'Package items and attach return label. Drop off at any location.'
-    };
+    }, null, 2);
   }
-};
+});
