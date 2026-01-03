@@ -26,6 +26,9 @@ This plugin incorporates lessons learned from actual OpenAI Agents SDK projects:
 3. **Entry Point**: Use `run()` function, not `agents.run()`
 4. **Response Access**: Results are in `result.finalOutput`
 5. **Agent Creation**: Use `new Agent()` constructor or `Agent.create()` for handoffs
+6. **Streaming Events**: Use `run(agent, message, { stream: true })` and handle `raw_model_stream_event` for real-time output
+7. **Text Delta Path**: Text deltas are in `event.data.delta` (string) when `event.data.type === 'output_text_delta'`
+8. **Agent Updated Event**: Use `agent_updated_stream_event` to track agent changes during handoffs
 
 ### Zod Schema Requirements (Strict Mode)
 
@@ -44,6 +47,69 @@ OpenAI's API uses **strict mode** for structured outputs, which means:
 // Load environment variables BEFORE SDK imports
 import 'dotenv/config';
 import { run } from '@openai/agents';
+```
+
+### Streaming Implementation
+
+```typescript
+import { run, MemorySession } from '@openai/agents';
+
+// Enable streaming
+const streamResult = await run(agent, message, {
+  stream: true,
+  maxTurns: 10,
+  agentHooks: { /* hooks */ },
+  inputGuardrails: [ /* guardrails */ ]
+});
+
+// Process stream events
+for await (const event of streamResult) {
+  switch (event.type) {
+    case 'agent_updated_stream_event':
+      // Agent changed (handoff)
+      console.log(`Agent: ${event.agent.name}`);
+      break;
+
+    case 'raw_model_stream_event':
+      // Text delta from model
+      if (event.data?.type === 'output_text_delta' && typeof event.data.delta === 'string') {
+        process.stdout.write(event.data.delta); // Stream in real-time
+      }
+      break;
+
+    case 'run_handoff_stream_event':
+      // Handoff occurred
+      console.log(`Handoff: ${event.currentAgent.name} → ${event.targetAgent.name}`);
+      break;
+
+    case 'input_guardrail_tripwire_triggered_stream_event':
+      // Guardrail blocked input
+      const response = event.tripwireTriggeredData.responseData;
+      console.error(`Blocked: ${response.refusalReason}`);
+      return;
+  }
+}
+```
+
+**Key Streaming Event Types:**
+- `agent_updated_stream_event` - Agent changed during execution
+- `raw_model_stream_event` - Model response chunks (check `event.data.type === 'output_text_delta'`)
+- `run_handoff_stream_event` - Agent handoff occurred
+- `run_tool_call_stream_event` - Tool was called
+- `input_guardrail_tripwire_triggered_stream_event` - Guardrail blocked input
+
+### Session Management
+
+```typescript
+import { MemorySession } from '@openai/agents';
+
+// Create a session for conversation context
+const session = new MemorySession();
+
+// Pass to run() for multi-turn conversations
+const result = await run(agent, message, { session });
+
+// Session maintains context across requests automatically
 ```
 
 ### Handoff Syntax
@@ -282,6 +348,7 @@ The plugin includes comprehensive examples and templates to help you get started
 - **advanced-patterns.md** - Agent-as-tool, memory, streaming, error recovery
 - **triage-pattern.md** - Detailed guide to triage pattern best practices
 - **mcp-integration.md** - Model Context Protocol (MCP) server integration
+- **streaming-cli.md** - **NEW**: Complete streaming CLI with sessions, guardrails, and hooks
 
 **Advanced Patterns:**
 - **human-in-the-loop.md** - Human approval workflows for sensitive operations
